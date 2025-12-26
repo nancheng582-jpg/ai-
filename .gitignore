@@ -1,0 +1,22 @@
+# 临时文件
+~$*
+
+# 办公文档
+*.docx
+*.pptx
+*.xmind
+
+# 操作系统文件
+Thumbs.db
+.DS_Store
+
+# IDE配置
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 其他临时文件
+*.tmp
+*.log
+*.bak

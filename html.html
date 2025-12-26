@@ -1,0 +1,1602 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 大厨 - 智能食谱助手</title>
+    
+    <!-- Vue 3 CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    
+    <!-- Phosphor Icons (图标库) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <style>
+        /* --- CSS 变量与重置 --- */
+        :root {
+            --primary: #10B981; /* 翡翠绿 */
+            --primary-dark: #059669;
+            --secondary: #F59E0B; /* 琥珀色 */
+            --danger: #EF4444;
+            --info: #3B82F6; /* 蓝色用于提示 */
+            --purple: #8B5CF6; /* 紫色用于AI计划 */
+            --bg-body: #F3F4F6;
+            --bg-card: #FFFFFF;
+            --text-main: #1F2937;
+            --text-muted: #6B7280;
+            --border: #E5E7EB;
+            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            --radius: 12px;
+            --header-height: 60px;
+            --nav-height: 60px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            line-height: 1.5;
+            padding-bottom: calc(var(--nav-height) + 20px); /* 为底部导航留空间 */
+        }
+
+        /* --- 布局容器 --- */
+        #app {
+            max-width: 1200px;
+            margin: 0 auto;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-content {
+            padding: 20px;
+            flex: 1;
+        }
+
+        /* --- 头部 --- */
+        header {
+            background-color: var(--bg-card);
+            padding: 0 20px;
+            height: var(--header-height);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .brand {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* --- 导航栏 (响应式) --- */
+        /* 移动端底部导航 */
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: var(--nav-height);
+            background-color: var(--bg-card);
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            box-shadow: 0 -2px 10px rgba(0,0,0,0.05);
+            z-index: 100;
+        }
+
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-decoration: none;
+            flex: 1;
+            height: 100%;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+
+        .nav-item i {
+            font-size: 1.5rem;
+            margin-bottom: 2px;
+        }
+
+        .nav-item.active {
+            color: var(--primary);
+        }
+
+        /* 桌面端调整 (大于 1024px) */
+        @media (min-width: 1024px) {
+            body {
+                padding-bottom: 0;
+                padding-left: 240px; /* 为侧边栏留空间 */
+            }
+
+            .nav-bar {
+                width: 240px;
+                height: 100vh;
+                top: 0;
+                left: 0;
+                flex-direction: column;
+                justify-content: flex-start;
+                padding-top: 80px;
+                border-right: 1px solid var(--border);
+                box-shadow: none;
+            }
+
+            .nav-item {
+                flex: 0;
+                height: 50px;
+                width: 100%;
+                flex-direction: row;
+                justify-content: flex-start;
+                padding-left: 30px;
+                font-size: 1rem;
+                gap: 15px;
+            }
+            
+            .nav-item i {
+                margin-bottom: 0;
+            }
+
+            header {
+                left: 240px;
+                width: calc(100% - 240px);
+                position: fixed;
+            }
+            
+            .main-content {
+                margin-top: var(--header-height);
+            }
+        }
+
+        /* --- 通用组件 --- */
+        .btn {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.95rem;
+            transition: background 0.2s;
+            user-select: none;
+        }
+
+        .btn:hover {
+            background-color: var(--primary-dark);
+        }
+        
+        .btn:disabled {
+            background-color: #9CA3AF;
+            cursor: not-allowed;
+        }
+
+        .btn-outline {
+            background-color: transparent;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+        }
+        
+        .btn-danger {
+            background-color: var(--danger);
+        }
+
+        .btn-info {
+            background-color: var(--info);
+            color: white;
+        }
+
+        .btn-info:hover {
+            background-color: #2563EB;
+        }
+
+        .btn-purple {
+            background-color: var(--purple);
+            color: white;
+        }
+        
+        .btn-purple:hover {
+            background-color: #7C3AED;
+        }
+        
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.85rem;
+        }
+
+        .btn-icon {
+            padding: 8px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-icon:hover {
+            background-color: #E5E7EB;
+            color: var(--primary);
+        }
+
+        .input-group {
+            margin-bottom: 15px;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .card {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            margin-bottom: 20px;
+        }
+
+        .grid-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .tag-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .tag {
+            background: #ECFDF5;
+            color: var(--primary-dark);
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tag .close {
+            cursor: pointer;
+            opacity: 0.6;
+        }
+
+        .loading-spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* --- 列表模式样式 (库存) --- */
+        .pantry-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .pantry-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            transition: all 0.2s;
+        }
+
+        .pantry-item.expiring {
+            border-color: #FCD34D;
+            background-color: #FFFBEB;
+        }
+
+        .pantry-item.expired {
+            border-color: #FCA5A5;
+            background-color: #FEF2F2;
+        }
+
+        .pantry-info {
+            flex: 1;
+        }
+
+        .pantry-name {
+            font-weight: 600;
+            font-size: 1rem;
+        }
+
+        .pantry-meta {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* --- 悬浮倒计时 --- */
+        .floating-timers-container {
+            position: fixed;
+            bottom: 80px; /* nav height + margin */
+            right: 20px;
+            display: flex;
+            flex-direction: column-reverse; /* 新的在下面 */
+            gap: 10px;
+            z-index: 2000;
+            pointer-events: none; /* 让点击穿透空白区域 */
+        }
+        
+        @media (min-width: 1024px) {
+            .floating-timers-container {
+                bottom: 20px;
+            }
+        }
+
+        .timer-float {
+            background: var(--text-main);
+            color: white;
+            padding: 12px 16px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            pointer-events: auto;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            min-width: 200px;
+            animation: slideInRight 0.3s ease;
+        }
+
+        @keyframes slideInRight {
+            from { transform: translateX(100%); opacity: 0; }
+            to { transform: translateX(0); opacity: 1; }
+        }
+
+        .timer-time {
+            font-family: monospace;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .step-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding: 8px;
+            border-radius: 8px;
+            transition: background 0.1s;
+        }
+        
+        .step-item:hover {
+            background: #F9FAFB;
+        }
+
+        .step-number {
+            background: var(--primary);
+            color: white;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .step-content {
+            flex: 1;
+            line-height: 1.6;
+        }
+
+        .step-timer-btn {
+            color: var(--primary);
+            cursor: pointer;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        .step-timer-btn:hover {
+            background: #ECFDF5;
+        }
+
+        /* Recipe Card */
+        .recipe-card h3 {
+            margin-bottom: 10px;
+            color: var(--text-main);
+        }
+        .recipe-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+        }
+        .recipe-actions {
+            margin-top: 15px;
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        /* Shopping List */
+        .shopping-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .shopping-item.checked span {
+            text-decoration: line-through;
+            color: var(--text-muted);
+        }
+        .shopping-item input[type="checkbox"] {
+            margin-right: 12px;
+            width: 20px;
+            height: 20px;
+            accent-color: var(--primary);
+        }
+
+        /* Meal Plan */
+        .day-column {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            padding: 15px;
+            min-height: 150px;
+            border: 1px dashed var(--border);
+        }
+        .day-header {
+            font-weight: 700;
+            margin-bottom: 10px;
+            text-align: center;
+            color: var(--primary);
+            padding-bottom: 8px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        .meal-slot {
+            background: var(--bg-body);
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 8px;
+            margin-top: 8px;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .meal-slot.ai-suggested {
+            background: #F5F3FF;
+            border: 1px solid #C4B5FD;
+            color: #5B21B6;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal-content {
+            background: white;
+            padding: 25px;
+            border-radius: var(--radius);
+            width: 90%;
+            max-width: 600px;
+            max-height: 85vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        
+        .fade-enter-active, .fade-leave-active {
+            transition: opacity 0.3s ease;
+        }
+        .fade-enter-from, .fade-leave-to {
+            opacity: 0;
+        }
+
+        /* Advice Box Style */
+        .advice-box {
+            background-color: #EFF6FF;
+            border-left: 4px solid #3B82F6;
+            padding: 15px;
+            margin-top: 15px;
+            border-radius: 4px;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+
+<div id="app">
+    <!-- 头部 -->
+    <header>
+        <div class="brand">
+            <i class="ph-fill ph-chef-hat"></i>
+            AI 大厨
+        </div>
+        <div class="header-actions">
+            <!-- 仅在移动端显示当前页面标题 -->
+            <span v-if="isMobile" style="font-weight: 600;">{{ currentViewTitle }}</span>
+        </div>
+    </header>
+
+    <!-- 主内容区 -->
+    <main class="main-content">
+        
+        <!-- 1. 生成食谱页面 (Generator) -->
+        <div v-if="currentView === 'generator'" class="view-generator">
+            <div class="card">
+                <h2><i class="ph ph-magic-wand"></i> AI 食谱生成</h2>
+                <p style="color:var(--text-muted); margin-bottom: 20px;">输入您现有的食材，让 AI 为您推荐美味佳肴。</p>
+                
+                <div class="input-group">
+                    <label>我的食材 (用空格或逗号分隔)</label>
+                    <div style="display:flex; gap:10px;">
+                        <input type="text" class="form-control" v-model="ingredientInput" @keyup.enter="addIngredient" placeholder="例如: 鸡蛋 番茄 牛肉">
+                        <button class="btn btn-outline" @click="addIngredient">添加</button>
+                    </div>
+                    <div class="tag-container">
+                        <div v-for="(ing, index) in currentIngredients" :key="index" class="tag">
+                            {{ ing }}
+                            <span class="close" @click="removeIngredient(index)">&times;</span>
+                        </div>
+                        <button v-if="pantry.length > 0" class="tag" style="background:#F3F4F6; color:black; border:1px dashed #ccc" @click="addFromPantry">
+                            + 从冰箱添加
+                        </button>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <label>饮食偏好 (可选)</label>
+                    <select class="form-control" v-model="preference">
+                        <option value="">无特殊偏好</option>
+                        <option value="低卡路里">低卡路里 (减肥)</option>
+                        <option value="高蛋白">高蛋白 (增肌)</option>
+                        <option value="快速简单">快速简单 (15分钟内)</option>
+                        <option value="素食">素食</option>
+                        <option value="家常菜">中式家常菜</option>
+                    </select>
+                </div>
+
+                <button class="btn" style="width:100%" @click="generateRecipe" :disabled="isGenerating || currentIngredients.length === 0">
+                    <div v-if="isGenerating" class="loading-spinner" style="width:20px; height:20px; border-width:2px; margin-right:8px;"></div>
+                    {{ isGenerating ? 'AI 正在思考中...' : '生成食谱' }}
+                </button>
+            </div>
+
+            <!-- 生成结果展示 -->
+            <div v-if="generatedRecipe" class="card recipe-card" style="border: 2px solid var(--primary);">
+                <h3>{{ generatedRecipe.title }}</h3>
+                <div class="recipe-meta">
+                    <span><i class="ph ph-clock"></i> {{ generatedRecipe.time }}</span>
+                    <span><i class="ph ph-fire"></i> {{ generatedRecipe.calories }}</span>
+                </div>
+                <div style="margin-bottom:15px;">
+                    <strong>需要食材:</strong>
+                    <div class="tag-container">
+                        <span v-for="item in generatedRecipe.ingredients" class="tag">{{ item }}</span>
+                    </div>
+                </div>
+                <div style="margin-bottom:15px;">
+                    <strong>烹饪步骤:</strong>
+                    <ol style="padding-left:20px; color: var(--text-main); margin-top:8px;">
+                        <li v-for="step in generatedRecipe.steps" style="margin-bottom:5px;">{{ step }}</li>
+                    </ol>
+                </div>
+                <div class="recipe-actions">
+                    <button class="btn btn-outline" @click="generatedRecipe = null">关闭</button>
+                    <button class="btn" @click="saveGeneratedRecipe"><i class="ph ph-heart"></i> 收藏食谱</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. 食谱库页面 (Recipes) -->
+        <div v-if="currentView === 'recipes'" class="view-recipes">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2>我的食谱 ({{ savedRecipes.length }})</h2>
+                <button class="btn btn-sm btn-outline" @click="clearAllRecipes" v-if="savedRecipes.length > 0">清空</button>
+            </div>
+
+            <div v-if="savedRecipes.length === 0" style="text-align:center; padding:40px; color:var(--text-muted);">
+                <i class="ph ph-book-open" style="font-size:3rem; margin-bottom:10px; display:block;"></i>
+                暂无收藏食谱，快去生成一个吧！
+            </div>
+
+            <div class="grid-list">
+                <div v-for="recipe in savedRecipes" :key="recipe.id" class="card recipe-card">
+                    <h3>{{ recipe.title }}</h3>
+                    <div class="recipe-meta">
+                        <span><i class="ph ph-clock"></i> {{ recipe.time }}</span>
+                        <span><i class="ph ph-fire"></i> {{ recipe.calories }}</span>
+                    </div>
+                    <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:15px;">
+                        主要食材: {{ recipe.ingredients.slice(0,3).join(', ') }}...
+                    </p>
+                    <div class="recipe-actions">
+                        <button class="btn btn-sm btn-outline" @click="viewRecipeDetails(recipe)">查看详情</button>
+                        <button class="btn btn-sm btn-outline" @click="addToPlan(recipe)"><i class="ph ph-calendar-plus"></i></button>
+                        <button class="btn btn-sm btn-danger" @click="deleteRecipe(recipe.id)"><i class="ph ph-trash"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. 食材/冰箱页面 (Pantry) -->
+        <div v-if="currentView === 'pantry'" class="view-pantry">
+            
+            <!-- 挑选指南小工具 -->
+            <div class="card" style="background: linear-gradient(135deg, #EFF6FF 0%, #FFFFFF 100%); border: 1px solid #BFDBFE;">
+                <h3 style="color: #1E40AF; display:flex; align-items:center; gap:8px;">
+                    <i class="ph-fill ph-lightbulb"></i> 食材挑选指南
+                </h3>
+                <p style="font-size:0.9rem; color:var(--text-muted); margin-bottom:10px;">
+                    不知道如何挑选新鲜食材？输入名称问问 AI 吧。
+                </p>
+                <div style="display:flex; gap:10px;">
+                    <input type="text" class="form-control" v-model="adviceInput" placeholder="例如: 西瓜 / 三文鱼 / 茄子" @keyup.enter="getAdvice(adviceInput)">
+                    <button class="btn btn-info" @click="getAdvice(adviceInput)" :disabled="isGettingAdvice">
+                        {{ isGettingAdvice ? '查询中...' : '查询' }}
+                    </button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2><i class="ph ph-snowflake"></i> 我的冰箱库存</h2>
+                
+                <div class="input-group" style="margin-top:20px; background: #F9FAFB; padding: 15px; border-radius: 8px;">
+                    <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 10px; align-items: end;">
+                        <div>
+                            <label>食材名称</label>
+                            <input type="text" class="form-control" v-model="pantryNameInput" placeholder="例如: 牛奶" @keyup.enter="addToPantry">
+                        </div>
+                        <div>
+                            <label>过期日期</label>
+                            <input type="date" class="form-control" v-model="pantryDateInput">
+                        </div>
+                        <button class="btn" @click="addToPantry">
+                            <i class="ph ph-plus"></i> 入库
+                        </button>
+                    </div>
+                </div>
+
+                <div style="margin-top:20px;">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <h4>当前库存 ({{ pantry.length }})</h4>
+                        <span style="font-size:0.8rem; color:var(--text-muted);">按过期时间排序</span>
+                    </div>
+                    
+                    <div v-if="pantry.length > 0" class="pantry-list">
+                        <div v-for="item in sortedPantry" :key="item.id" class="pantry-item" :class="getPantryItemStatus(item.expiry).class">
+                            <div class="pantry-info">
+                                <div class="pantry-name">{{ item.name }}</div>
+                                <div class="pantry-meta">
+                                    <i class="ph ph-calendar"></i> {{ item.expiry || '未设置日期' }} 
+                                    <span v-if="item.expiry">
+                                        ({{ getPantryItemStatus(item.expiry).text }})
+                                    </span>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-outline btn-danger" style="border:none;" @click="removeFromPantry(item.id)">
+                                <i class="ph ph-trash" style="font-size:1.2rem;"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <p v-else style="text-align:center; padding:30px; color:var(--text-muted);">
+                        冰箱空空如也，快去采购吧~
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- 4. 购物清单 (Shopping) -->
+        <div v-if="currentView === 'shopping'" class="view-shopping">
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h2><i class="ph ph-shopping-cart"></i> 购物清单</h2>
+                    <button class="btn btn-sm btn-outline" @click="clearCompletedShopping">清除已购</button>
+                </div>
+                
+                <div class="input-group" style="margin-top:20px;">
+                    <input type="text" class="form-control" v-model="shoppingInput" @keyup.enter="addShoppingItem" placeholder="添加购买项...">
+                </div>
+
+                <div style="margin-top:10px;">
+                    <div v-for="item in shoppingList" :key="item.id" class="shopping-item" :class="{ checked: item.checked }">
+                        <label style="display:flex; align-items:center; flex:1; cursor:pointer;">
+                            <input type="checkbox" v-model="item.checked">
+                            <span>{{ item.name }}</span>
+                        </label>
+                        <div style="display:flex; gap:5px;">
+                            <button class="btn-icon" @click="getAdvice(item.name)" title="查看挑选建议" style="color:var(--info);">
+                                <i class="ph ph-lightbulb" style="font-size:1.2rem;"></i>
+                            </button>
+                            <button class="btn-icon" style="color:#EF4444;" @click="removeShoppingItem(item.id)">
+                                <i class="ph ph-trash" style="font-size:1.2rem;"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div v-if="shoppingList.length === 0" style="text-align:center; padding:20px; color:var(--text-muted);">
+                        清单是空的
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. 膳食计划 (Plan) -->
+        <div v-if="currentView === 'plan'" class="view-plan">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                <h2><i class="ph ph-calendar"></i> 本周膳食计划</h2>
+                <button class="btn btn-purple" @click="openPlanModal">
+                    <i class="ph ph-sparkle"></i> AI 智能排程
+                </button>
+            </div>
+
+            <div class="grid-list" style="margin-top:20px;">
+                <div v-for="day in daysOfWeek" :key="day" class="day-column">
+                    <div class="day-header">{{ day }}</div>
+                    <div v-for="(meal, idx) in mealPlan[day]" :key="idx" class="meal-slot" :class="{ 'ai-suggested': meal.isAi }">
+                        <div style="flex:1;">
+                            <div style="font-weight:500;">{{ meal.title }}</div>
+                            <div v-if="meal.isAi" style="font-size:0.75rem; opacity:0.8;">
+                                <i class="ph-fill ph-sparkle"></i> AI 推荐
+                            </div>
+                        </div>
+                        <i class="ph ph-x" style="cursor:pointer; color:#EF4444; margin-left:8px;" @click="removeFromPlan(day, idx)"></i>
+                    </div>
+                    <div v-if="!mealPlan[day] || mealPlan[day].length === 0" style="text-align:center; font-size:0.8rem; color:var(--text-muted); padding:10px;">
+                        未计划
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 6. 设置页面 (Settings) -->
+        <div v-if="currentView === 'settings'" class="view-settings">
+            <div class="card">
+                <h2><i class="ph ph-gear"></i> 设置</h2>
+                <div class="input-group" style="margin-top:20px;">
+                    <label>智谱 AI API Key (GLM)</label>
+                    <input type="password" class="form-control" v-model="apiSettings.key" placeholder="输入您的 API Key">
+                    <small style="color:var(--text-muted); display:block; margin-top:5px;">
+                        您的 Key 仅存储在本地浏览器的 LocalStorage 中，不会上传到任何服务器。
+                    </small>
+                </div>
+                <div class="input-group">
+                    <label>API URL (可选, 默认无需修改)</label>
+                    <input type="text" class="form-control" v-model="apiSettings.url" placeholder="https://open.bigmodel.cn/api/paas/v4/chat/completions">
+                </div>
+                <button class="btn" @click="saveSettings">保存设置</button>
+                <div v-if="settingsSaved" style="color:var(--primary); margin-top:10px;">设置已保存！</div>
+            </div>
+            
+            <div class="card">
+                <h3>关于</h3>
+                <p>AI 大厨 v1.4 (Icon Fix) <br> 基于 Vue 3 + ZhipuGLM</p>
+                <button class="btn btn-outline btn-sm" style="margin-top:15px;" @click="resetApp">重置所有数据</button>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 导航栏 -->
+    <nav class="nav-bar">
+        <a class="nav-item" :class="{ active: currentView === 'generator' }" @click="currentView = 'generator'">
+            <i class="ph ph-magic-wand"></i>
+            <span>生成</span>
+        </a>
+        <a class="nav-item" :class="{ active: currentView === 'recipes' }" @click="currentView = 'recipes'">
+            <i class="ph ph-book-bookmark"></i>
+            <span>食谱</span>
+        </a>
+        <a class="nav-item" :class="{ active: currentView === 'pantry' }" @click="currentView = 'pantry'">
+            <i class="ph ph-snowflake"></i>
+            <span>冰箱</span>
+        </a>
+        <a class="nav-item" :class="{ active: currentView === 'shopping' }" @click="currentView = 'shopping'">
+            <i class="ph ph-shopping-cart"></i>
+            <span>购物</span>
+        </a>
+        <a class="nav-item" :class="{ active: currentView === 'plan' }" @click="currentView = 'plan'">
+            <i class="ph ph-calendar"></i>
+            <span>计划</span>
+        </a>
+        <a class="nav-item" :class="{ active: currentView === 'settings' }" @click="currentView = 'settings'">
+            <i class="ph ph-gear"></i>
+            <span>设置</span>
+        </a>
+    </nav>
+
+    <!-- 食谱详情模态框 -->
+    <div v-if="selectedRecipe" class="modal-overlay" @click.self="selectedRecipe = null">
+        <div class="modal-content">
+            <div style="display:flex; justify-content:space-between; align-items:start;">
+                <h3>{{ selectedRecipe.title }}</h3>
+                <button @click="selectedRecipe = null" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+            </div>
+            
+            <div class="recipe-meta" style="margin: 10px 0;">
+                <span><i class="ph ph-clock"></i> {{ selectedRecipe.time }}</span>
+                <span><i class="ph ph-fire"></i> {{ selectedRecipe.calories }}</span>
+            </div>
+            
+            <div style="background:#F9FAFB; padding:15px; border-radius:8px; margin-bottom:20px;">
+                <h4 style="margin-bottom:10px;">所需食材:</h4>
+                <div class="tag-container">
+                    <span v-for="ing in selectedRecipe.ingredients" class="tag">{{ ing }}</span>
+                </div>
+                <div style="margin-top:10px;">
+                    <button class="btn btn-sm btn-outline" @click="addIngredientsToShopping(selectedRecipe)">
+                        <i class="ph ph-plus"></i> 加入购物清单
+                    </button>
+                </div>
+            </div>
+
+            <h4 style="margin-bottom:15px;">详细烹饪步骤:</h4>
+            <div>
+                <div v-for="(step, index) in selectedRecipe.steps" :key="index" class="step-item">
+                    <div class="step-number">{{ index + 1 }}</div>
+                    <div class="step-content">{{ step }}</div>
+                    <div class="step-timer-btn" @click="tryStartTimer(step)" title="开始计时">
+                        <i class="ph ph-timer" style="font-size:1.2rem;"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 挑选建议模态框 -->
+    <div v-if="adviceModalOpen" class="modal-overlay" @click.self="closeAdviceModal">
+        <div class="modal-content">
+            <div style="display:flex; justify-content:space-between; align-items:start; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
+                <h3 style="color:#1E40AF; display:flex; align-items:center; gap:8px;">
+                    <i class="ph-fill ph-lightbulb"></i> {{ currentAdviceItem }} 挑选指南
+                </h3>
+                <button @click="closeAdviceModal" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+            </div>
+            
+            <div v-if="isGettingAdvice" style="text-align:center; padding:30px;">
+                <div class="loading-spinner" style="margin:0 auto 15px auto;"></div>
+                <p>正在咨询 AI 专家...</p>
+            </div>
+
+            <div v-else class="advice-box">
+                {{ currentAdvice }}
+            </div>
+
+            <div style="margin-top:20px; text-align:right;">
+                <button class="btn" @click="closeAdviceModal">知道了</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI 计划生成设置模态框 (新增) -->
+    <div v-if="planModalOpen" class="modal-overlay" @click.self="planModalOpen = false">
+        <div class="modal-content">
+            <div style="display:flex; justify-content:space-between; align-items:start; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:15px;">
+                <h3 style="color:var(--purple); display:flex; align-items:center; gap:8px;">
+                    <i class="ph-fill ph-sparkle"></i> AI 智能周计划
+                </h3>
+                <button @click="planModalOpen = false" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+            </div>
+            
+            <p style="color:var(--text-muted); font-size:0.9rem; margin-bottom:20px;">
+                AI 将根据您的冰箱库存为您规划未来一周（周一至周日）的膳食。
+            </p>
+
+            <div class="input-group">
+                <label>本周目标</label>
+                <select class="form-control" v-model="planGoal">
+                    <option value="清空冰箱库存">优先清空冰箱库存</option>
+                    <option value="均衡饮食">营养均衡</option>
+                    <option value="快速手残党">快速简单 (30分钟内)</option>
+                    <option value="减肥低卡">低卡路里 (减肥)</option>
+                    <option value="增肌高蛋白">高蛋白 (增肌)</option>
+                </select>
+            </div>
+
+            <div class="input-group">
+                <label>额外要求 (例如: 不吃辣, 周末想吃好的)</label>
+                <input type="text" class="form-control" v-model="planExtraReq" placeholder="选填...">
+            </div>
+
+            <div v-if="pantry.length > 0" style="margin-bottom:20px;">
+                <label style="font-size:0.9rem; font-weight:500;">将优先使用库存:</label>
+                <div style="font-size:0.85rem; color:var(--text-muted); margin-top:5px;">
+                    {{ pantry.slice(0, 5).map(i => i.name).join(', ') }}{{ pantry.length > 5 ? ' 等...' : '' }}
+                </div>
+            </div>
+
+            <button class="btn btn-purple" style="width:100%" @click="generateWeeklyPlan" :disabled="isGeneratingPlan">
+                <div v-if="isGeneratingPlan" class="loading-spinner" style="width:20px; height:20px; border-width:2px; margin-right:8px; border-color:white; border-top-color:rgba(255,255,255,0.5);"></div>
+                {{ isGeneratingPlan ? '正在规划中...' : '生成周计划' }}
+            </button>
+        </div>
+    </div>
+
+    <!-- 悬浮倒计时容器 -->
+    <div class="floating-timers-container">
+        <div v-for="timer in activeTimers" :key="timer.id" class="timer-float">
+            <div style="flex:1;">
+                <div style="font-size:0.8rem; opacity:0.8;">{{ timer.label }}</div>
+                <div class="timer-time">{{ formatTime(timer.remaining) }}</div>
+            </div>
+            <button @click="stopTimer(timer.id)" style="background:rgba(255,255,255,0.2); border:none; color:white; border-radius:50%; width:30px; height:30px; cursor:pointer; display:flex; align-items:center; justify-content:center;">
+                <i class="ph ph-x"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const { createApp, ref, reactive, computed, onMounted, watch } = Vue;
+
+    const app = createApp({
+        setup() {
+            // --- 状态管理 ---
+            const currentView = ref('generator');
+            const ingredientInput = ref('');
+            const currentIngredients = ref([]);
+            const preference = ref('');
+            const isGenerating = ref(false);
+            const generatedRecipe = ref(null);
+            const selectedRecipe = ref(null);
+            
+            // 数据存储
+            const pantry = ref([]); // {id, name, expiry}
+            const pantryNameInput = ref('');
+            const pantryDateInput = ref('');
+
+            const savedRecipes = ref([]);
+            const shoppingList = ref([]);
+            const shoppingInput = ref('');
+            const mealPlan = reactive({
+                '周一': [], '周二': [], '周三': [], '周四': [], '周五': [], '周六': [], '周日': []
+            });
+            const apiSettings = reactive({
+                key: '',
+                url: 'https://open.bigmodel.cn/api/paas/v4/chat/completions'
+            });
+            const settingsSaved = ref(false);
+            
+            // 计时器系统
+            const activeTimers = ref([]);
+
+            // 挑选建议系统
+            const adviceInput = ref('');
+            const adviceModalOpen = ref(false);
+            const currentAdvice = ref('');
+            const currentAdviceItem = ref('');
+            const isGettingAdvice = ref(false);
+
+            // AI 计划系统
+            const planModalOpen = ref(false);
+            const isGeneratingPlan = ref(false);
+            const planGoal = ref('清空冰箱库存');
+            const planExtraReq = ref('');
+
+            const daysOfWeek = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
+
+            // 响应式判断
+            const isMobile = ref(window.innerWidth < 1024);
+            window.addEventListener('resize', () => {
+                isMobile.value = window.innerWidth < 1024;
+            });
+
+            // 视图标题映射
+            const currentViewTitle = computed(() => {
+                const map = {
+                    'generator': 'AI 生成',
+                    'recipes': '我的食谱',
+                    'pantry': '我的冰箱',
+                    'shopping': '购物清单',
+                    'plan': '膳食计划',
+                    'settings': '系统设置'
+                };
+                return map[currentView.value];
+            });
+
+            // --- 生命周期与持久化 ---
+            onMounted(() => {
+                loadData();
+            });
+
+            // 监听数据变化自动保存
+            watch([pantry, savedRecipes, shoppingList, mealPlan, apiSettings], () => {
+                saveData();
+            }, { deep: true });
+
+            function saveData() {
+                localStorage.setItem('aic_pantry_v2', JSON.stringify(pantry.value));
+                localStorage.setItem('aic_recipes', JSON.stringify(savedRecipes.value));
+                localStorage.setItem('aic_shopping', JSON.stringify(shoppingList.value));
+                localStorage.setItem('aic_plan', JSON.stringify(mealPlan));
+                localStorage.setItem('aic_settings', JSON.stringify(apiSettings));
+            }
+
+            function loadData() {
+                const p = localStorage.getItem('aic_pantry_v2');
+                if (p) {
+                    pantry.value = JSON.parse(p);
+                } else {
+                    const oldP = localStorage.getItem('aic_pantry');
+                    if (oldP) {
+                        try {
+                            const oldArr = JSON.parse(oldP);
+                            if (Array.isArray(oldArr) && typeof oldArr[0] === 'string') {
+                                pantry.value = oldArr.map(name => ({
+                                    id: Date.now() + Math.random(),
+                                    name: name,
+                                    expiry: ''
+                                }));
+                            }
+                        } catch(e) {}
+                    }
+                }
+                
+                const r = localStorage.getItem('aic_recipes');
+                if (r) savedRecipes.value = JSON.parse(r);
+                
+                const s = localStorage.getItem('aic_shopping');
+                if (s) shoppingList.value = JSON.parse(s);
+                
+                const m = localStorage.getItem('aic_plan');
+                if (m) Object.assign(mealPlan, JSON.parse(m));
+                
+                const set = localStorage.getItem('aic_settings');
+                if (set) Object.assign(apiSettings, JSON.parse(set));
+            }
+
+            // 辅助函数：检查是否只包含 ASCII 字符
+            function isAscii(str) {
+                return /^[\x00-\x7F]*$/.test(str);
+            }
+
+            // 辅助函数：获取 API Key 并校验
+            function getValidApiKey() {
+                const apiKey = apiSettings.key ? apiSettings.key.trim() : '';
+                if (!apiKey) {
+                    alert('请先在"设置"页面配置智谱 GLM API Key');
+                    currentView.value = 'settings';
+                    return null;
+                }
+                if (!isAscii(apiKey)) {
+                    alert('API Key 格式错误：包含了非法的字符（如中文或全角符号）。请检查设置并重新输入。');
+                    currentView.value = 'settings';
+                    return null;
+                }
+                return apiKey;
+            }
+
+            // --- 核心：AI 智能排程 (新增) ---
+            function openPlanModal() {
+                planModalOpen.value = true;
+            }
+
+            async function generateWeeklyPlan() {
+                const apiKey = getValidApiKey();
+                if (!apiKey) return;
+
+                isGeneratingPlan.value = true;
+                
+                // 收集冰箱库存名称
+                const pantryItems = pantry.value.map(i => i.name).join(', ');
+                
+                const prompt = `
+                    请为我制定未来一周（周一到周日）的膳食计划。
+                    我的冰箱里有这些食材：${pantryItems || '无，请推荐常规食材'}。
+                    我的主要目标是：${planGoal.value}。
+                    ${planExtraReq.value ? '额外要求：' + planExtraReq.value : ''}。
+                    
+                    请为每一天推荐1道主菜。
+                    必须严格返回纯 JSON 格式，不要包含 Markdown 标记。
+                    JSON 结构示例：
+                    {
+                        "周一": ["菜名A"],
+                        "周二": ["菜名B"],
+                        ...
+                    }
+                `;
+
+                try {
+                    const response = await fetch(apiSettings.url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: "glm-4-flash",
+                            messages: [
+                                { role: "system", content: "你是一个专业的膳食规划师。只返回纯JSON数据，键名必须是'周一'到'周日'。" },
+                                { role: "user", content: prompt }
+                            ],
+                            temperature: 0.7
+                        })
+                    });
+
+                    if (!response.ok) throw new Error('API 请求失败');
+
+                    const data = await response.json();
+                    let content = data.choices[0].message.content;
+                    content = content.replace(/```json/g, '').replace(/```/g, '').trim();
+                    const newPlan = JSON.parse(content);
+
+                    // 填充到现有计划中，保留现有计划，追加新的
+                    // 或者我们可以提示用户是否覆盖？这里简单起见，追加进去
+                    
+                    for (const day of daysOfWeek) {
+                        if (newPlan[day] && Array.isArray(newPlan[day])) {
+                            // 清空旧的 AI 计划 (可选，这里不清空，直接追加)
+                            // 将 AI 推荐的项转换为对象格式
+                            const aiMeals = newPlan[day].map(title => ({
+                                title: title,
+                                id: Date.now() + Math.random(), // 临时 ID
+                                isAi: true // 标记为 AI 生成
+                            }));
+                            mealPlan[day].push(...aiMeals);
+                        }
+                    }
+                    
+                    planModalOpen.value = false;
+                    alert('AI 周计划已生成！');
+
+                } catch (error) {
+                    console.error(error);
+                    alert('生成计划失败：' + error.message);
+                } finally {
+                    isGeneratingPlan.value = false;
+                }
+            }
+
+
+            // --- 核心：AI 调用 (挑选建议) ---
+            async function getAdvice(name) {
+                if (!name || !name.trim()) return;
+                const apiKey = getValidApiKey();
+                if (!apiKey) return;
+
+                currentAdviceItem.value = name;
+                adviceModalOpen.value = true;
+                isGettingAdvice.value = true;
+                currentAdvice.value = '';
+
+                const prompt = `
+                    请简明扼要地告诉我如何挑选优质新鲜的"${name}"，以及如何判断其新鲜度。
+                    请列出2-3个关键点即可，总字数控制在150字以内。
+                    语气亲切专业。
+                `;
+
+                try {
+                    const response = await fetch(apiSettings.url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: "glm-4-flash",
+                            messages: [
+                                { role: "system", content: "你是一个经验丰富的大厨和食材采购专家。" },
+                                { role: "user", content: prompt }
+                            ],
+                            temperature: 0.7
+                        })
+                    });
+
+                    if (!response.ok) throw new Error('API 请求失败');
+
+                    const data = await response.json();
+                    currentAdvice.value = data.choices[0].message.content;
+
+                } catch (error) {
+                    console.error(error);
+                    currentAdvice.value = '获取建议失败，请检查网络或 API Key。错误：' + error.message;
+                } finally {
+                    isGettingAdvice.value = false;
+                    adviceInput.value = ''; // 清空输入框
+                }
+            }
+
+            function closeAdviceModal() {
+                adviceModalOpen.value = false;
+                currentAdvice.value = '';
+            }
+
+            // --- 核心：AI 调用 (食谱生成) ---
+            async function generateRecipe() {
+                const apiKey = getValidApiKey();
+                if (!apiKey) return;
+
+                isGenerating.value = true;
+                generatedRecipe.value = null;
+
+                const prompt = `
+                    作为一个专业大厨，请根据以下食材：${currentIngredients.value.join(', ')}。
+                    ${preference.value ? '额外要求：' + preference.value : ''}。
+                    请生成一道详细菜谱。
+                    严格按照JSON格式返回，不要包含Markdown标记。
+                    JSON结构如下：
+                    {
+                        "title": "菜名",
+                        "time": "预计时间",
+                        "calories": "预估卡路里",
+                        "ingredients": ["食材1", "食材2"],
+                        "steps": ["步骤1 (请包含具体时间，如煮10分钟)", "步骤2"]
+                    }
+                `;
+
+                try {
+                    const response = await fetch(apiSettings.url, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: "glm-4-flash",
+                            messages: [
+                                { role: "system", content: "你是一个专业的AI营养师和大厨。只返回纯JSON数据。" },
+                                { role: "user", content: prompt }
+                            ],
+                            temperature: 0.7
+                        })
+                    });
+
+                    if (!response.ok) throw new Error('API 请求失败');
+
+                    const data = await response.json();
+                    let content = data.choices[0].message.content;
+                    content = content.replace(/```json/g, '').replace(/```/g, '').trim();
+                    generatedRecipe.value = JSON.parse(content);
+
+                } catch (error) {
+                    console.error(error);
+                    alert('生成食谱失败，请检查网络或 API Key。错误：' + error.message);
+                } finally {
+                    isGenerating.value = false;
+                }
+            }
+
+            function saveGeneratedRecipe() {
+                if (generatedRecipe.value) {
+                    const newRecipe = {
+                        ...generatedRecipe.value,
+                        id: Date.now()
+                    };
+                    savedRecipes.value.unshift(newRecipe);
+                    alert('食谱已保存！');
+                    generatedRecipe.value = null;
+                    currentIngredients.value = [];
+                    currentView.value = 'recipes';
+                }
+            }
+            
+            // --- 业务逻辑 (常规) ---
+            function addIngredient() {
+                const val = ingredientInput.value.trim();
+                if (val) {
+                    const items = val.split(/[\s,，]+/).filter(i => i);
+                    items.forEach(i => {
+                        if (!currentIngredients.value.includes(i)) {
+                            currentIngredients.value.push(i);
+                        }
+                    });
+                    ingredientInput.value = '';
+                }
+            }
+            
+            function removeIngredient(index) {
+                currentIngredients.value.splice(index, 1);
+            }
+
+            function addFromPantry() {
+                pantry.value.forEach(item => {
+                    if (!currentIngredients.value.includes(item.name)) {
+                        currentIngredients.value.push(item.name);
+                    }
+                });
+            }
+
+            function deleteRecipe(id) {
+                if(confirm('确定删除这个食谱吗？')) {
+                    savedRecipes.value = savedRecipes.value.filter(r => r.id !== id);
+                }
+            }
+            
+            function clearAllRecipes() {
+                if(confirm('确定清空所有食谱吗？')) {
+                    savedRecipes.value = [];
+                }
+            }
+
+            function viewRecipeDetails(recipe) {
+                selectedRecipe.value = recipe;
+            }
+
+            function addToPantry() {
+                if (pantryNameInput.value.trim()) {
+                    pantry.value.push({
+                        id: Date.now(),
+                        name: pantryNameInput.value.trim(),
+                        expiry: pantryDateInput.value
+                    });
+                    pantryNameInput.value = '';
+                    pantryDateInput.value = '';
+                }
+            }
+            
+            function removeFromPantry(id) {
+                pantry.value = pantry.value.filter(i => i.id !== id);
+            }
+
+            const sortedPantry = computed(() => {
+                return [...pantry.value].sort((a, b) => {
+                    if (!a.expiry) return 1;
+                    if (!b.expiry) return -1;
+                    return new Date(a.expiry) - new Date(b.expiry);
+                });
+            });
+
+            function getPantryItemStatus(expiryDate) {
+                if (!expiryDate) return { text: '', class: '' };
+                const now = new Date();
+                const expiry = new Date(expiryDate);
+                now.setHours(0,0,0,0);
+                expiry.setHours(0,0,0,0);
+                const diffTime = expiry - now;
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+                if (diffDays < 0) {
+                    return { text: `已过期 ${Math.abs(diffDays)} 天`, class: 'expired' };
+                } else if (diffDays === 0) {
+                    return { text: '今天过期', class: 'expiring' };
+                } else if (diffDays <= 3) {
+                    return { text: `还有 ${diffDays} 天`, class: 'expiring' };
+                } else {
+                    return { text: `还有 ${diffDays} 天`, class: '' };
+                }
+            }
+
+            function tryStartTimer(stepText) {
+                const regex = /(\d+)\s*(分钟|min|minute|小时|hour|h)/i;
+                const match = stepText.match(regex);
+                let minutes = 0;
+                let label = "步骤计时";
+                if (match) {
+                    const num = parseInt(match[1]);
+                    const unit = match[2].toLowerCase();
+                    if (unit.startsWith('h') || unit.includes('小时')) {
+                        minutes = num * 60;
+                    } else {
+                        minutes = num;
+                    }
+                    label = `计时: ${match[0]}`;
+                } else {
+                    const input = prompt("请输入倒计时分钟数:", "5");
+                    if (input && !isNaN(input)) {
+                        minutes = parseFloat(input);
+                    } else {
+                        return;
+                    }
+                }
+                startTimer(label, minutes);
+            }
+
+            function startTimer(label, minutes) {
+                const id = Date.now();
+                const timerObj = reactive({
+                    id,
+                    label: label.length > 15 ? label.substring(0,15)+'...' : label,
+                    remaining: minutes * 60,
+                    intervalId: null
+                });
+                timerObj.intervalId = setInterval(() => {
+                    timerObj.remaining--;
+                    if (timerObj.remaining <= 0) {
+                        clearInterval(timerObj.intervalId);
+                        alert(`${timerObj.label} 时间到了！`);
+                        stopTimer(id);
+                    }
+                }, 1000);
+                activeTimers.value.push(timerObj);
+            }
+
+            function stopTimer(id) {
+                const idx = activeTimers.value.findIndex(t => t.id === id);
+                if (idx !== -1) {
+                    clearInterval(activeTimers.value[idx].intervalId);
+                    activeTimers.value.splice(idx, 1);
+                }
+            }
+
+            function formatTime(seconds) {
+                const m = Math.floor(seconds / 60);
+                const s = Math.floor(seconds % 60);
+                return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+            }
+
+            function addShoppingItem() {
+                if (shoppingInput.value.trim()) {
+                    shoppingList.value.push({
+                        id: Date.now(),
+                        name: shoppingInput.value.trim(),
+                        checked: false
+                    });
+                    shoppingInput.value = '';
+                }
+            }
+            function removeShoppingItem(id) {
+                shoppingList.value = shoppingList.value.filter(i => i.id !== id);
+            }
+            function clearCompletedShopping() {
+                shoppingList.value = shoppingList.value.filter(i => !i.checked);
+            }
+            function addIngredientsToShopping(recipe) {
+                recipe.ingredients.forEach(ing => {
+                    shoppingList.value.push({
+                        id: Date.now() + Math.random(),
+                        name: ing,
+                        checked: false
+                    });
+                });
+                alert('食材已加入购物清单');
+            }
+
+            function addToPlan(recipe) {
+                const day = prompt('请输入要加入哪一天 (周一 到 周日):', '周一');
+                if (daysOfWeek.includes(day)) {
+                    mealPlan[day].push({
+                        title: recipe.title,
+                        id: recipe.id
+                    });
+                    alert(`已加入${day}的计划`);
+                } else if (day) {
+                    alert('输入无效，请输入 周一 至 周日');
+                }
+            }
+            function removeFromPlan(day, index) {
+                mealPlan[day].splice(index, 1);
+            }
+
+            function saveSettings() {
+                saveData();
+                settingsSaved.value = true;
+                setTimeout(() => settingsSaved.value = false, 2000);
+            }
+            
+            function resetApp() {
+                if(confirm('警告：这将清除所有本地数据，包括食谱和 API Key。确定吗？')) {
+                    localStorage.clear();
+                    location.reload();
+                }
+            }
+
+            return {
+                currentView,
+                currentViewTitle,
+                ingredientInput,
+                currentIngredients,
+                preference,
+                isGenerating,
+                generatedRecipe,
+                selectedRecipe,
+                pantry,
+                pantryNameInput,
+                pantryDateInput,
+                savedRecipes,
+                shoppingList,
+                shoppingInput,
+                mealPlan,
+                daysOfWeek,
+                apiSettings,
+                settingsSaved,
+                isMobile,
+                activeTimers,
+                sortedPantry,
+                adviceInput,
+                adviceModalOpen,
+                currentAdvice,
+                currentAdviceItem,
+                isGettingAdvice,
+                planModalOpen,
+                isGeneratingPlan,
+                planGoal,
+                planExtraReq,
+                addIngredient,
+                removeIngredient,
+                addFromPantry,
+                generateRecipe,
+                saveGeneratedRecipe,
+                deleteRecipe,
+                clearAllRecipes,
+                viewRecipeDetails,
+                addToPantry,
+                removeFromPantry,
+                getPantryItemStatus,
+                addShoppingItem,
+                removeShoppingItem,
+                clearCompletedShopping,
+                addIngredientsToShopping,
+                addToPlan,
+                removeFromPlan,
+                saveSettings,
+                resetApp,
+                tryStartTimer,
+                stopTimer,
+                formatTime,
+                getAdvice,
+                closeAdviceModal,
+                openPlanModal,
+                generateWeeklyPlan
+            };
+        }
+    });
+
+    app.mount('#app');
+</script>
+
+</body>
+</html>
